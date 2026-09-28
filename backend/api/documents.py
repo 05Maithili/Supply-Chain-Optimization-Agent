@@ -16,7 +16,7 @@ from services.llm_client import get_llm_client, ORCHESTRATOR_SYSTEM_PROMPT
 
 router = APIRouter()
 
-UPLOAD_DIR = Path("uploads/documents")
+UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads" / "documents"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {"pdf", "txt", "docx"}

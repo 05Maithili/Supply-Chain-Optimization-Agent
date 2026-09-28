@@ -111,12 +111,14 @@ def _build_context_prompt(state: AgentState) -> str:
 
     if state.retrieved_context and state.retrieved_context != "No documents available.":
         sections.append(
-            f"RETRIEVED POLICY DOCUMENTS:\n{state.retrieved_context}\n"
+            f"RETRIEVED SUPPLY CHAIN POLICY & DOCUMENTATION (from RAG Document Agent):\n"
+            f"{state.retrieved_context}\n\n"
+            f"INSTRUCTION FOR POLICY QUESTIONS: Answer the query thoroughly and directly by referencing and citing the specific sources and clauses from the retrieved policy documents above."
         )
 
     sections.append(
-        f"\nBased ONLY on the tool-calculated results above, provide a structured analysis. "
-        f"Do NOT invent any numbers. Cite which tool/agent provided each piece of data."
+        f"\nBased ONLY on the tool-calculated and document-retrieved results above, provide a structured analysis. "
+        f"Do NOT invent any numbers or false policy claims. Cite which tool, agent, or document provided each piece of data."
     )
 
     return "\n\n".join(sections)
@@ -155,9 +157,16 @@ def _generate_fallback_response(state: AgentState) -> str:
         "## Supply Chain Analysis Report",
         f"**Query:** {state.user_query}",
         "",
-        "**Note:** AI explanation is temporarily unavailable. Showing raw tool results.",
+        "**Note:** AI explanation is temporarily unavailable. Showing raw tool and document retrieval results.",
         "",
     ]
+
+    if state.retrieved_context and state.retrieved_context != "No documents available.":
+        lines += [
+            "### Retrieved Document Context (RAG)",
+            state.retrieved_context,
+            "",
+        ]
 
     if state.inventory_result and "error" not in state.inventory_result:
         ir = state.inventory_result

@@ -25,29 +25,29 @@ Analyze the user query and return ONLY a valid JSON object with this exact struc
   }
 }
 
-Intent and Agent Selection Rules:
-- questions about stockout, stockout risk, stock levels, safety stock, reorder:
-  intent: "inventory_check"
-  required_agents: ["inventory", "risk", "decision"]
-- questions about future demand, sales prediction, forecast:
-  intent: "demand_forecast"
-  required_agents: ["demand", "decision"]
-- questions about supplier comparison, vendor risk, supplier scoring:
-  intent: "supplier_analysis"
-  required_agents: ["supplier", "decision"]
-- questions about logistics, transport cost, delivery, routes, warehouse fulfillment:
-  intent: "logistics_optimization"
-  required_agents: ["logistics", "decision"]
-- questions about why a product is high risk or system-wide disruptions:
-  intent: "risk_analysis"
-  required_agents: ["inventory", "risk", "decision"]
-- questions about policies, manuals, procedures:
+Intent and Agent Selection Rules (CRITICAL):
+- Questions about policies, documents, manuals, procedures, contracts, rules, guidelines, compliance, uploaded files (e.g. "What does the procurement policy say about safety stock?", "Explain supplier lead time rules in the document", "What is the return policy?"):
   intent: "rag_query"
   required_agents: ["rag", "decision"]
-- overview or general status of entire supply chain:
+- Questions about stockout, stockout risk, current stock levels, safety stock quantities, reorder points for products:
+  intent: "inventory_check"
+  required_agents: ["inventory", "risk", "decision"]
+- Questions about future demand, sales prediction, forecast:
+  intent: "demand_forecast"
+  required_agents: ["demand", "decision"]
+- Questions about supplier comparison, vendor risk, supplier scoring:
+  intent: "supplier_analysis"
+  required_agents: ["supplier", "decision"]
+- Questions about logistics, transport cost, delivery, routes, warehouse fulfillment:
+  intent: "logistics_optimization"
+  required_agents: ["logistics", "decision"]
+- Questions about why a product is high risk or system-wide disruptions:
+  intent: "risk_analysis"
+  required_agents: ["inventory", "risk", "decision"]
+- Overview or general status of entire supply chain:
   intent: "general_summary"
   required_agents: ["inventory", "risk", "supplier", "decision"]
-- multi-agent scenario (e.g. demand changed by X%, what actions across inventory/supplier/shipping):
+- Multi-agent scenario (e.g. demand changed by X%, what actions across inventory/supplier/shipping):
   intent: "multi_agent"
   required_agents: ["demand", "inventory", "supplier", "logistics", "decision"]
 
@@ -59,6 +59,17 @@ Return ONLY valid JSON.
 async def classify_intent(state: AgentState) -> AgentState:
     """Classify intent and extract entities from the user query."""
     llm = get_llm_client()
+    q_lower = state.user_query.lower()
+
+    # Define policy/document indicator keywords
+    policy_keywords = [
+        "policy", "policies", "document", "documents", "manual", "manuals",
+        "sop", "guideline", "guidelines", "procedure", "procedures",
+        "rule", "rules", "contract", "contracts", "compliance", "clause",
+        "handbook", "uploaded", "file", "pdf", "docx", "rag", "procurement policy",
+        "procurement guideline", "terms of service", "sla", "slas"
+    ]
+    is_policy_query = any(w in q_lower for w in policy_keywords)
 
     try:
         response = await llm.chat(
@@ -112,17 +123,26 @@ async def classify_intent(state: AgentState) -> AgentState:
         state.extracted_entities = cleaned
 
         # Heuristic correction for required agents
-        q_lower = state.user_query.lower()
-        if any(w in q_lower for w in ["stockout", "out of stock", "reorder", "safety stock", "stock level", "inventory"]):
-            if "inventory" not in state.required_agents:
-                state.required_agents.insert(0, "inventory")
-            if "risk" not in state.required_agents:
-                state.required_agents.append("risk")
-            if "demand" in state.required_agents and not any(w in q_lower for w in ["forecast", "future demand", "predict"]):
-                state.required_agents.remove("demand")
+        if is_policy_query:
+            if "rag" not in state.required_agents:
+                state.required_agents.insert(0, "rag")
+            # If the user is specifically inquiring about policy/documentation without requesting live calculations
+            has_quant_request = any(w in q_lower for w in ["forecast demand", "predict sales", "optimize route", "calculate eoq"])
+            if not has_quant_request and state.intent != "multi_agent":
+                state.intent = "rag_query"
+                # Strip pure DB calculation agents if query is purely conceptual / policy
+                state.required_agents = [a for a in state.required_agents if a in ["rag", "decision"]]
+        else:
+            if any(w in q_lower for w in ["stockout", "out of stock", "reorder", "safety stock", "stock level", "inventory"]):
+                if "inventory" not in state.required_agents:
+                    state.required_agents.insert(0, "inventory")
+                if "risk" not in state.required_agents:
+                    state.required_agents.append("risk")
+                if "demand" in state.required_agents and not any(w in q_lower for w in ["forecast", "future demand", "predict"]):
+                    state.required_agents.remove("demand")
 
         if not state.required_agents:
-            state.required_agents = ["inventory", "risk", "decision"]
+            state.required_agents = ["rag", "decision"] if is_policy_query else ["inventory", "risk", "decision"]
         elif "decision" not in state.required_agents:
             state.required_agents.append("decision")
 
@@ -130,8 +150,12 @@ async def classify_intent(state: AgentState) -> AgentState:
 
     except Exception as e:
         logger.warning(f"Intent classification failed: {e}. Using fallback.")
-        state.intent = "general_summary"
-        state.required_agents = ["inventory", "risk", "decision"]
+        if is_policy_query:
+            state.intent = "rag_query"
+            state.required_agents = ["rag", "decision"]
+        else:
+            state.intent = "general_summary"
+            state.required_agents = ["inventory", "risk", "decision"]
         state.errors.append(f"Intent classification error: {str(e)}")
 
     return state

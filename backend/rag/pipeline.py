@@ -14,7 +14,7 @@ from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
-VECTOR_STORE_DIR = Path("rag/vector_store")
+VECTOR_STORE_DIR = Path(__file__).resolve().parent / "vector_store"
 VECTOR_STORE_DIR.mkdir(parents=True, exist_ok=True)
 
 # Embedding model (local, no API key needed)
@@ -96,7 +96,7 @@ def chunk_text(
     return chunks
 
 
-# ── Vector Store (FAISS) ──────────────────────────────────────────────────────
+# ── Vector Store (FAISS / NumPy) ──────────────────────────────────────────────
 
 class FAISSVectorStore:
     def __init__(self, store_id: str):
@@ -111,24 +111,32 @@ class FAISSVectorStore:
         meta_path = self.store_path / "metadata.json"
         emb_path = self.store_path / "embeddings.npy"
         if meta_path.exists() and emb_path.exists():
-            with open(meta_path, "r") as f:
-                self.chunks = json.load(f)
-            self.embeddings = np.load(str(emb_path))
-            logger.info(f"Loaded vector store '{self.store_id}' with {len(self.chunks)} chunks")
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    self.chunks = json.load(f)
+                self.embeddings = np.load(str(emb_path))
+                logger.info(f"Loaded vector store '{self.store_id}' with {len(self.chunks)} chunks")
+            except Exception as e:
+                logger.error(f"Error loading vector store '{self.store_id}': {e}")
+                self.chunks = []
+                self.embeddings = None
 
     def _save(self):
-        with open(self.store_path / "metadata.json", "w") as f:
+        with open(self.store_path / "metadata.json", "w", encoding="utf-8") as f:
             json.dump(self.chunks, f, indent=2)
         np.save(str(self.store_path / "embeddings.npy"), self.embeddings)
 
     def add_chunks(self, chunks: list[dict]):
+        if not chunks:
+            return 0
         model = get_embed_model()
         texts = [c["text"] for c in chunks]
         new_embeddings = model.encode(texts, show_progress_bar=False)
+        new_embeddings = np.atleast_2d(new_embeddings)
 
-        if self.embeddings is None:
+        if self.embeddings is None or len(self.chunks) == 0:
             self.embeddings = new_embeddings
-            self.chunks = chunks
+            self.chunks = list(chunks)
         else:
             self.embeddings = np.vstack([self.embeddings, new_embeddings])
             self.chunks.extend(chunks)
@@ -142,19 +150,28 @@ class FAISSVectorStore:
 
         model = get_embed_model()
         query_emb = model.encode([query])
+        query_emb = np.atleast_2d(query_emb)
 
-        # Cosine similarity
-        norms = np.linalg.norm(self.embeddings, axis=1, keepdims=True)
-        query_norm = np.linalg.norm(query_emb)
-        cos_sims = (self.embeddings @ query_emb.T).squeeze() / (norms.squeeze() * query_norm + 1e-8)
+        # Cosine similarity safe calculation
+        norms = np.linalg.norm(self.embeddings, axis=1)
+        query_norm = float(np.linalg.norm(query_emb))
+        if query_norm == 0:
+            query_norm = 1e-8
 
-        top_indices = np.argsort(cos_sims)[::-1][:top_k]
+        dot_products = (self.embeddings @ query_emb.T).reshape(-1)
+        cos_sims = dot_products / (norms * query_norm + 1e-8)
+        cos_sims = np.atleast_1d(cos_sims)
+
+        effective_k = min(top_k, len(self.chunks))
+        top_indices = np.argsort(cos_sims)[::-1][:effective_k]
         results = []
         for idx in top_indices:
-            results.append({
-                **self.chunks[int(idx)],
-                "score": float(cos_sims[int(idx)]),
-            })
+            idx_int = int(idx)
+            if 0 <= idx_int < len(self.chunks):
+                results.append({
+                    **self.chunks[idx_int],
+                    "score": float(cos_sims[idx_int]),
+                })
         return results
 
 

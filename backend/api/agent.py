@@ -92,13 +92,21 @@ async def query_agent(request: AgentQueryRequest):
             "logistics_risk": rr.get("logistics_risk"),
         }
 
+    if final_state.rag_sources:
+        tool_results_summary["rag_retrieval"] = {
+            "num_chunks_retrieved": len(final_state.rag_sources),
+            "documents": list(dict.fromkeys(r.get("source", "Unknown") for r in final_state.rag_sources)),
+        }
+
     # RAG sources
     rag_sources = [
         {
             "source": r.get("source", "Unknown"),
+            "chunk_id": r.get("chunk_id"),
             "relevance_score": round(r.get("score", 0), 3),
+            "excerpt": (r.get("text", "")[:160] + "...") if r.get("text") else "",
         }
-        for r in final_state.rag_sources[:3]
+        for r in final_state.rag_sources[:5]
     ]
 
     return {
