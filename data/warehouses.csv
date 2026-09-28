@@ -1,0 +1,4 @@
+warehouse_id,warehouse_name,location,latitude,longitude,capacity,current_utilization
+W001,North Regional Warehouse,Delhi India,28.7041,77.1025,50000,68.5
+W002,West Distribution Center,Mumbai India,19.0760,72.8777,40000,72.3
+W003,South Fulfillment Hub,Chennai India,13.0827,80.2707,35000,55.8

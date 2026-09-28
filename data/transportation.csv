@@ -1,0 +1,11 @@
+route_id,origin_warehouse_id,destination,distance_km,base_cost_per_unit,transit_time_days,transport_mode,carrier
+R001,W001,Pune India,1400,18.5,3,Road,SpeedEx Carriers
+R002,W001,Hyderabad India,1500,19.0,4,Road,BlueDart Logistics
+R003,W001,Kolkata India,1500,20.0,3,Rail,Indian Rail Freight
+R004,W002,Bangalore India,980,14.0,2,Road,SpeedEx Carriers
+R005,W002,Ahmedabad India,530,10.0,2,Road,BlueDart Logistics
+R006,W002,Pune India,190,5.5,1,Road,Local Freight Co
+R007,W003,Bangalore India,350,7.0,1,Road,Southern Carriers
+R008,W003,Hyderabad India,630,11.0,2,Road,BlueDart Logistics
+R009,W001,Ahmedabad India,940,15.0,2,Road,SpeedEx Carriers
+R010,W002,Hyderabad India,1400,18.0,3,Road,SpeedEx Carriers

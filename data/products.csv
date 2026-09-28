@@ -1,0 +1,13 @@
+product_id,product_name,category,unit_price,sku,weight_kg
+P101,Industrial Motor Drive A1,Electronics,1250.00,SKU-P101,12.5
+P102,Hydraulic Pump HP-200,Machinery,890.00,SKU-P102,18.0
+P103,Control Panel CP-400,Electronics,640.00,SKU-P103,8.5
+P104,Steel Beam S-300,Raw Materials,210.00,SKU-P104,45.0
+P105,Conveyor Belt CB-150,Machinery,430.00,SKU-P105,22.0
+P106,Safety Valve SV-80,Components,95.00,SKU-P106,1.2
+P107,Bearing Assembly BA-12,Components,145.00,SKU-P107,2.5
+P108,Industrial Filter IF-500,Components,78.00,SKU-P108,3.0
+P109,Electric Motor EM-75,Electronics,520.00,SKU-P109,9.8
+P110,Pressure Gauge PG-30,Instruments,62.00,SKU-P110,0.5
+P111,Compressor Unit CU-600,Machinery,3400.00,SKU-P111,85.0
+P112,Heat Exchanger HX-90,Equipment,1850.00,SKU-P112,42.0
